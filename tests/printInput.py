@@ -50,7 +50,7 @@ def plot_view(points, triangles, segments, elev, azim, output_path, title):
 def main():
     if len(sys.argv) != 2 or sys.argv[1] in ('-h', '--help'):
         print("""\nUso:
-    python plot_bsp.py <arquivo_entrada.in>
+    python3 printInput.py <arquivo_entrada.in>
 
 Descrição:
     Este script lê um arquivo de entrada no formato BSP (pontos, triângulos e segmentos),
