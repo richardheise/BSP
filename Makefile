@@ -1,26 +1,26 @@
-# Nome do compilador
+# Compilador e flags
 CXX = g++
-
-# Flags de compilação
-CXXFLAGS = -Wall -Wextra -O2
+CXXFLAGS = -Wall -Wextra -std=c++17 -O2
 
 # Nome do executável
 TARGET = bsp
 
-# Arquivos fonte
-SRCS = main.cpp
-
-# Arquivos de cabeçalho
-HDRS = bsp.hpp
+# Fontes e objetos
+SRCS = main.cpp bsp.cpp
+OBJS = $(SRCS:.cpp=.o)
 
 # Regra padrão
 all: $(TARGET)
 
-# Como compilar o executável
-$(TARGET): $(SRCS) $(HDRS)
-	$(CXX) $(CXXFLAGS) -o $(TARGET) $(SRCS)
+# Compilação do executável
+$(TARGET): $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $^
 
-# Limpa os arquivos gerados
+# Limpeza
 clean:
-	rm -f $(TARGET)
+	rm -f $(OBJS) $(TARGET)
 
+# Recompilação
+rebuild: clean all
+
+.PHONY: all clean rebuild

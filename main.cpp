@@ -53,5 +53,10 @@ int main(int argc, char *argv[]) {
     data.printSegments();
   }
 
+  auto root = buildBSPTree(data.triangles, data.points);
+  if (verbose) {
+    printBSPTree(root, 15);
+  }
+
   return 0;
 }
