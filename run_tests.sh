@@ -1,8 +1,9 @@
 #!/bin/bash
 
-# Caminho para o diretório de testes
+# Caminho para os diretórios de testes
 TEST_DIR="tests/inputs"
 OUTPUT_DIR="tests/outputs"
+ANSWER_DIR="tests/answers"
 VERBOSE=""
 PRINT_STDOUT=false
 
@@ -37,6 +38,7 @@ mkdir -p "$OUTPUT_DIR"
 for test_file in "$TEST_DIR"/*.in; do
   test_name=$(basename "$test_file" .in)
   output_file="$OUTPUT_DIR/${test_name}.out"
+  answer_file="$ANSWER_DIR/${test_name}.out"
 
   echo "Executando teste: $test_file"
 
@@ -45,6 +47,19 @@ for test_file in "$TEST_DIR"/*.in; do
   else
     ./bsp $VERBOSE < "$test_file" > "$output_file"
     echo "Saída escrita em: $output_file"
+  fi
+
+  # Se o arquivo de resposta existe, compara usando diff
+  if [[ -f "$answer_file" ]]; then
+    diff_output=$(diff -u "$answer_file" "$output_file")
+    if [[ $? -eq 0 ]]; then
+      echo "✔ Teste $test_name: saída correta."
+    else
+      echo "✘ Teste $test_name: saída diferente da esperada:"
+      echo "$diff_output"
+    fi
+  else
+    echo "⚠ Arquivo de resposta $answer_file não encontrado. Pulei a comparação."
   fi
 
   echo "-----------------------------"

@@ -53,10 +53,17 @@ int main(int argc, char *argv[]) {
     data.printSegments();
   }
 
-  auto root = buildBSPTree(data.triangles, data.points);
-  if (verbose) {
-    printBSPTree(root, 15);
-  }
+  // Processa os segmentos e obtém os triângulos interceptados
+  vector<vector<int>> results = processSegments(data);
 
+  // Imprime a saída conforme especificado
+  for (const auto& tri_list : results) {
+    cout << tri_list.size();
+    for (int idx : tri_list) {
+      cout << " " << idx;
+    }
+    cout << "\n";
+  }
+  
   return 0;
 }

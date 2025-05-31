@@ -2,79 +2,119 @@
 #define BSP_HPP
 
 #include <iostream>
-#include <tuple>
 #include <vector>
 #include <memory>
-#include <cmath>
+#include <set>
 
 using namespace std;
 
-// Define a estrutura de um ponto 3D
-typedef tuple<int, int, int> Point;
+// Estrutura para representar um vetor ou ponto 3D
+struct Vec3 {
+  int x, y, z;
 
-// Define a estrutura de um triângulo (índices dos vértices)
-typedef tuple<int, int, int> Triangle;
+  Vec3() : x(0), y(0), z(0) {}
+  Vec3(int x, int y, int z) : x(x), y(y), z(z) {}
 
-// Define a estrutura de um segmento de reta (dois pontos extremos)
-typedef tuple<int, int, int, int, int, int> Segment;
+  Vec3 operator-(const Vec3& other) const {
+    return Vec3(x - other.x, y - other.y, z - other.z);
+  }
 
-// Define um plano a partir de um ponto e um vetor normal (ambos inteiros)
-struct Plane {
-  Point point;           // Ponto no plano
-  Point normal;          // Vetor normal ao plano
+  Vec3 cross(const Vec3& other) const {
+    return Vec3(
+      y * other.z - z * other.y,
+      z * other.x - x * other.z,
+      x * other.y - y * other.x
+    );
+  }
+
+  int dot(const Vec3& other) const {
+    return x * other.x + y * other.y + z * other.z;
+  }
 };
 
-// Enum para classificar posição de triângulo em relação a um plano
-enum Position { FRONT, BACK, SPANNING, COPLANAR };
+// Estrutura para representar um triângulo por índices de vértices
+struct Triangle {
+  int a, b, c;
 
-// Estrutura principal para armazenar toda a entrada e opções de impressão
+  Triangle(int a, int b, int c) : a(a), b(b), c(c) {}
+};
+
+// Estrutura para representar um segmento de reta
+struct Segment {
+  Vec3 p1, p2;
+
+  Segment(int xa, int ya, int za, int xb, int yb, int zb)
+    : p1(xa, ya, za), p2(xb, yb, zb) {}
+};
+
+// Estrutura para representar um plano
+struct Plane {
+  Vec3 point;
+  Vec3 normal;
+
+  Plane() = default;
+  Plane(const Vec3& p, const Vec3& n) : point(p), normal(n) {}
+};
+
+// Enum class para representar posição de um triângulo em relação ao plano
+enum class Position { FRONT, BACK, SPANNING, COPLANAR };
+
+// Estrutura principal para armazenar os dados de entrada
 struct BSPData {
-  vector<Point> points;
+  vector<Vec3> points;
   vector<Triangle> triangles;
   vector<Segment> segments;
 
-  // Método para imprimir pontos
   void printPoints() const {
     cout << "Points (count: " << points.size() << "):\n";
-    for (const auto &[x, y, z] : points) {
-      cout << "  (" << x << ", " << y << ", " << z << ")\n";
-    }
+    for (const auto& p : points)
+      cout << "  (" << p.x << ", " << p.y << ", " << p.z << ")\n";
   }
 
-  // Método para imprimir triângulos
   void printTriangles() const {
     cout << "Triangles (count: " << triangles.size() << "):\n";
-    for (const auto &[a, b, c] : triangles) {
-      cout << "  [" << a << ", " << b << ", " << c << "]\n";
-    }
+    for (const auto& t : triangles)
+      cout << "  [" << t.a << ", " << t.b << ", " << t.c << "]\n";
   }
 
-  // Método para imprimir segmentos
   void printSegments() const {
     cout << "Segments (count: " << segments.size() << "):\n";
-    for (const auto &[xa, ya, za, xb, yb, zb] : segments) {
-      cout << "  (" << xa << ", " << ya << ", " << za << ") -> ("
-           << xb << ", " << yb << ", " << zb << ")\n";
-    }
+    for (const auto& s : segments)
+      cout << "  (" << s.p1.x << ", " << s.p1.y << ", " << s.p1.z << ") -> ("
+                << s.p2.x << ", " << s.p2.y << ", " << s.p2.z << ")\n";
   }
 };
 
 // Estrutura da árvore BSP
 struct BSPNode {
-  Triangle plane_triangle;        // Triângulo que define o plano do nó
-  Plane plane;                    // Plano calculado
-  vector<Triangle> coplanar;     // Triângulos no mesmo plano
-  unique_ptr<BSPNode> front;     // Subárvore à frente do plano
-  unique_ptr<BSPNode> back;      // Subárvore atrás do plano
+  int triangle_index;               // Índice do triângulo usado para dividir
+  Plane plane;                      // Plano que divide o espaço
+  unique_ptr<BSPNode> front;
+  unique_ptr<BSPNode> back;
 };
 
-void printBSPTree(const unique_ptr<BSPNode> &node, int depth = 0);
-unique_ptr<BSPNode> buildBSPTree(vector<Triangle> triangles, const vector<Point> &points);
-Position classifyTriangle(const Triangle &tri, const Plane &plane, const vector<Point> &points);
-Plane makePlane(const Triangle &tri, const vector<Point> &points);
-int dot(const Point &a, const Point &b);
-Point cross(const Point &a, const Point &b);
-Point subtract(const Point &a, const Point &b);
+// Função para calcular o plano de um triângulo
+Plane computePlane(const Vec3& p1, const Vec3& p2, const Vec3& p3);
 
+// Classifica um ponto em relação a um plano (frente, trás ou coplanar)
+int classifyPointToPlane(const Plane& plane, const Vec3& point);
+
+// Classifica um triângulo em relação a um plano
+Position classifyTriangle(const Plane& plane, const Triangle& tri, const vector<Vec3>& points);
+
+// Constrói a árvore BSP recursivamente
+unique_ptr<BSPNode> buildBSP(const vector<Triangle>& triangles, const vector<Vec3>& points, vector<int> triangle_indices);
+
+// Verifica se um segmento intersecta um plano
+bool segmentIntersectsPlane(const Vec3& a, const Vec3& b, const Plane& plane);
+
+// Verifica se um segmento intersecta um triângulo (versão simplificada)
+bool segmentIntersectsTriangle(const Vec3& a, const Vec3& b, const Triangle& tri, const vector<Vec3>& points);
+
+// Percorre a BSP coletando interseções entre um segmento e triângulos
+void queryBSP(const BSPNode* node, const Vec3& a, const Vec3& b, const vector<Triangle>& triangles, const vector<Vec3>& points, set<int>& result);
+
+// Função principal: processa todos os segmentos e retorna os índices dos triângulos interceptados
+vector<vector<int>> processSegments(const BSPData& data);
 
 #endif // BSP_HPP

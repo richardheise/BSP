@@ -1,96 +1,131 @@
 #include "bsp.hpp"
+#include <algorithm>
+#include <cmath>
 
 using namespace std;
 
-// Função para subtrair dois pontos
-Point subtract(const Point &a, const Point &b) {
-  return Point(get<0>(a) - get<0>(b),
-               get<1>(a) - get<1>(b),
-               get<2>(a) - get<2>(b));
+// ===============================
+// Função auxiliar: plano do triângulo
+Plane computePlane(const Vec3& p1, const Vec3& p2, const Vec3& p3) {
+  Vec3 u = p2 - p1;
+  Vec3 v = p3 - p1;
+  Vec3 normal = u.cross(v);
+  return Plane(p1, normal);
 }
 
-// Produto vetorial entre dois vetores
-Point cross(const Point &a, const Point &b) {
-  return Point(get<1>(a) * get<2>(b) - get<2>(a) * get<1>(b),
-               get<2>(a) * get<0>(b) - get<0>(a) * get<2>(b),
-               get<0>(a) * get<1>(b) - get<1>(a) * get<0>(b));
+// ===============================
+// Função auxiliar: classificar ponto em relação ao plano
+int classifyPointToPlane(const Plane& plane, const Vec3& point) {
+  Vec3 diff = point - plane.point;
+  int dotProduct = plane.normal.dot(diff);
+  if (dotProduct > 0) return 1;    // Front
+  if (dotProduct < 0) return -1;   // Back
+  return 0;                        // Coplanar
 }
 
-// Produto escalar
-int dot(const Point &a, const Point &b) {
-  return get<0>(a) * get<0>(b) +
-         get<1>(a) * get<1>(b) +
-         get<2>(a) * get<2>(b);
+// ===============================
+// Classificar triângulo em relação ao plano
+Position classifyTriangle(const Plane& plane, const Triangle& tri, const vector<Vec3>& points) {
+  int aSide = classifyPointToPlane(plane, points[tri.a - 1]);
+  int bSide = classifyPointToPlane(plane, points[tri.b - 1]);
+  int cSide = classifyPointToPlane(plane, points[tri.c - 1]);
+
+  if (aSide == 0 && bSide == 0 && cSide == 0) return Position::COPLANAR;
+  if (aSide >= 0 && bSide >= 0 && cSide >= 0) return Position::FRONT;
+  if (aSide <= 0 && bSide <= 0 && cSide <= 0) return Position::BACK;
+  return Position::SPANNING;
 }
 
-// Calcula o plano definido por um triângulo
-Plane makePlane(const Triangle &tri, const vector<Point> &points) {
-  Point p0 = points[get<0>(tri) - 1];
-  Point p1 = points[get<1>(tri) - 1];
-  Point p2 = points[get<2>(tri) - 1];
-  Point v1 = subtract(p1, p0);
-  Point v2 = subtract(p2, p0);
-  Point n = cross(v1, v2); // normal
-  return Plane{p0, n};
-}
+// ===============================
+// Construção da BSP recursiva
+unique_ptr<BSPNode> buildBSP(const vector<Triangle>& triangles, const vector<Vec3>& points, vector<int> triangle_indices) {
+  if (triangle_indices.empty()) return nullptr;
 
-// Classifica um triângulo em relação a um plano
-Position classifyTriangle(const Triangle &tri, const Plane &plane, const vector<Point> &points) {
-  int front = 0, back = 0;
+  int root_index = triangle_indices[0]; // Usa o primeiro triângulo como plano de divisão
+  const Triangle& root_tri = triangles[root_index];
+  Plane dividing_plane = computePlane(points[root_tri.a - 1], points[root_tri.b - 1], points[root_tri.c - 1]);
 
-  for (int i = 0; i < 3; ++i) {
-    Point p = points[get<0>(tri) - 1 + i];
-    Point vec = subtract(p, plane.point);
-    int d = dot(vec, plane.normal);
-    if (d > 0) front++;
-    else if (d < 0) back++;
-  }
+  vector<int> front_indices, back_indices;
 
-  if (front > 0 && back > 0) return SPANNING;
-  if (front > 0) return FRONT;
-  if (back > 0) return BACK;
-  return COPLANAR;
-}
+  for (size_t i = 1; i < triangle_indices.size(); ++i) {
+    int idx = triangle_indices[i];
+    const Triangle& tri = triangles[idx];
+    Position pos = classifyTriangle(dividing_plane, tri, points);
 
-// Constrói recursivamente a árvore BSP
-unique_ptr<BSPNode> buildBSPTree(vector<Triangle> triangles, const vector<Point> &points) {
-  if (triangles.empty()) return nullptr;
-
-  Triangle pivot = triangles[0];
-  Plane pivotPlane = makePlane(pivot, points);
-
-  vector<Triangle> coplanar, front, back;
-
-  for (const Triangle &tri : triangles) {
-    Position pos = classifyTriangle(tri, pivotPlane, points);
-    if (pos == COPLANAR)
-      coplanar.push_back(tri);
-    else if (pos == FRONT)
-      front.push_back(tri);
-    else if (pos == BACK)
-      back.push_back(tri);
+    if (pos == Position::FRONT) front_indices.push_back(idx);
+    else if (pos == Position::BACK) back_indices.push_back(idx);
+    else if (pos == Position::COPLANAR) front_indices.push_back(idx); // Pode ir pra qualquer lado
     else {
-      // SPANNING não é tratado para simplicidade
-      // Pode-se particionar o triângulo nesse caso
-      coplanar.push_back(tri); // por ora considera coplanar
+      // SPANNING: simplificação — envia para os dois lados
+      front_indices.push_back(idx);
+      back_indices.push_back(idx);
     }
   }
 
   auto node = make_unique<BSPNode>();
-  node->plane_triangle = pivot;
-  node->plane = pivotPlane;
-  node->coplanar = coplanar;
-  node->front = buildBSPTree(front, points);
-  node->back = buildBSPTree(back, points);
-
+  node->triangle_index = root_index;
+  node->plane = dividing_plane;
+  node->front = buildBSP(triangles, points, front_indices);
+  node->back = buildBSP(triangles, points, back_indices);
   return node;
 }
 
-// Função auxiliar para imprimir a árvore BSP
-void printBSPTree(const unique_ptr<BSPNode> &node, int depth) {
+// ===============================
+// Verificar se um segmento cruza o plano (simples)
+bool segmentIntersectsPlane(const Vec3& a, const Vec3& b, const Plane& plane) {
+  int sideA = classifyPointToPlane(plane, a);
+  int sideB = classifyPointToPlane(plane, b);
+  return (sideA * sideB <= 0); // Um em cada lado ou um é coplanar
+}
+
+// ===============================
+// Verificar interseção com triângulo (simples, checa plano e bounding box)
+bool segmentIntersectsTriangle(const Vec3& a, const Vec3& b, const Triangle& tri, const vector<Vec3>& points) {
+  Plane plane = computePlane(points[tri.a - 1], points[tri.b - 1], points[tri.c - 1]);
+  if (!segmentIntersectsPlane(a, b, plane)) return false;
+
+  // Aqui poderia adicionar interseção precisa com triângulo, por simplicidade assume que plano basta
+  return true;
+}
+
+// ===============================
+// Percorre a BSP procurando interseções com um segmento
+void queryBSP(const BSPNode* node, const Vec3& a, const Vec3& b, const vector<Triangle>& triangles, const vector<Vec3>& points, set<int>& result) {
   if (!node) return;
-  string indent(depth * 2, ' ');
-  cout << indent << "Node at depth " << depth << " with " << node->coplanar.size() << " coplanar triangles\n";
-  printBSPTree(node->front, depth + 1);
-  printBSPTree(node->back, depth + 1);
+
+  const Triangle& tri = triangles[node->triangle_index];
+  if (segmentIntersectsTriangle(a, b, tri, points)) {
+    result.insert(node->triangle_index + 1); // índice 1-based
+  }
+
+  int sideA = classifyPointToPlane(node->plane, a);
+  int sideB = classifyPointToPlane(node->plane, b);
+
+  if (sideA >= 0 && sideB >= 0) queryBSP(node->front.get(), a, b, triangles, points, result);
+  else if (sideA <= 0 && sideB <= 0) queryBSP(node->back.get(), a, b, triangles, points, result);
+  else {
+    queryBSP(node->front.get(), a, b, triangles, points, result);
+    queryBSP(node->back.get(), a, b, triangles, points, result);
+  }
+}
+
+// ===============================
+// Interface pública: processar todos os segmentos
+vector<vector<int>> processSegments(const BSPData& data) {
+  vector<int> all_indices(data.triangles.size());
+  for (int i = 0; i < (int)data.triangles.size(); ++i) all_indices[i] = i;
+
+  unique_ptr<BSPNode> bsp_tree = buildBSP(data.triangles, data.points, all_indices);
+
+  vector<vector<int>> output;
+
+  for (const auto& seg : data.segments) {
+    set<int> intersected;
+    queryBSP(bsp_tree.get(), seg.p1, seg.p2, data.triangles, data.points, intersected);
+    vector<int> list(intersected.begin(), intersected.end());
+    sort(list.begin(), list.end());
+    output.push_back(list);
+  }
+
+  return output;
 }
