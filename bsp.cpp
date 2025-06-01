@@ -6,17 +6,17 @@ using namespace std;
 
 // ======================================================================================================================= //
 
-Plane computePlane(const Vec3& p1, const Vec3& p2, const Vec3& p3) {
-  Vec3 u = p2 - p1;
-  Vec3 v = p3 - p1;
-  Vec3 normal = u.cross(v);
+Plane computePlane(const Point3D& p1, const Point3D& p2, const Point3D& p3) {
+  Point3D u = p2 - p1;
+  Point3D v = p3 - p1;
+  Point3D normal = u.cross(v);
   return Plane(p1, normal);
 }
 
 // ======================================================================================================================= //
 
-int classifyPointToPlane(const Plane& plane, const Vec3& point) {
-  Vec3 diff = point - plane.point;
+int classifyPointToPlane(const Plane& plane, const Point3D& point) {
+  Point3D diff = point - plane.point;
   int dotProduct = plane.normal.dot(diff);
   if (dotProduct > 0) return 1;    // Front
   if (dotProduct < 0) return -1;   // Back
@@ -25,7 +25,7 @@ int classifyPointToPlane(const Plane& plane, const Vec3& point) {
 
 // ======================================================================================================================= //
 
-Position classifyTriangle(const Plane& plane, const Triangle& tri, const vector<Vec3>& points) {
+Position classifyTriangle(const Plane& plane, const Triangle& tri, const vector<Point3D>& points) {
   int aSide = classifyPointToPlane(plane, points[tri.a - 1]);
   int bSide = classifyPointToPlane(plane, points[tri.b - 1]);
   int cSide = classifyPointToPlane(plane, points[tri.c - 1]);
@@ -38,7 +38,7 @@ Position classifyTriangle(const Plane& plane, const Triangle& tri, const vector<
 
 // ======================================================================================================================= //
 
-unique_ptr<BSPNode> buildBSP(const vector<Triangle>& triangles, const vector<Vec3>& points, vector<int> triangle_indices) {
+unique_ptr<BSPNode> buildBSP(const vector<Triangle>& triangles, const vector<Point3D>& points, vector<int> triangle_indices) {
   if (triangle_indices.empty()) return nullptr;
 
   int root_index = triangle_indices[0]; // Usa o primeiro triângulo como plano de divisão
@@ -72,10 +72,7 @@ unique_ptr<BSPNode> buildBSP(const vector<Triangle>& triangles, const vector<Vec
 
 // ======================================================================================================================= //
 
-bool segmentTriangleCoplanarIntersect(
-    const Vec3& a, const Vec3& b,
-    const Vec3& p0, const Vec3& p1, const Vec3& p2,
-    const Vec3& normal) {
+bool segmentTriangleCoplanarIntersect( const Point3D& a, const Point3D& b, const Point3D& p0, const Point3D& p1, const Point3D& p2, const Point3D& normal) {
 
   // Escolhe o plano de projeção com base no maior componente do vetor normal
   int axis = 0; // 0 = X, 1 = Y, 2 = Z
@@ -83,7 +80,7 @@ bool segmentTriangleCoplanarIntersect(
   if (abs(normal.z) > abs(normal.y) && abs(normal.z) > abs(normal.x)) axis = 2;
 
   // Função lambda para projetar um ponto em 2D
-  auto project = [&](const Vec3& v) -> pair<int, int> {
+  auto project = [&](const Point3D& v) -> pair<int, int> {
     if (axis == 0) return {v.y, v.z}; // projeta em YZ
     if (axis == 1) return {v.x, v.z}; // projeta em XZ
     return {v.x, v.y};                // projeta em XY
@@ -119,14 +116,13 @@ bool onSegment(pair<int, int> p, pair<int, int> q, pair<int, int> r) {
 
 // ======================================================================================================================= //
 
-bool segmentsIntersect2D(pair<int, int> p1, pair<int, int> q1,
-                         pair<int, int> p2, pair<int, int> q2) {
+bool segmentsIntersect2D(pair<int, int> p1, pair<int, int> q1, pair<int, int> p2, pair<int, int> q2) {
   int o1 = orientation(p1, q1, p2);
   int o2 = orientation(p1, q1, q2);
   int o3 = orientation(p2, q2, p1);
   int o4 = orientation(p2, q2, q1);
 
-  if (o1 != o2 && o3 != o4) return true;
+  if (o1 != o2 && o3 != o4) return true; // caso colinear
 
   // Casos especiais
   if (o1 == 0 && onSegment(p1, p2, q1)) return true;
@@ -139,8 +135,7 @@ bool segmentsIntersect2D(pair<int, int> p1, pair<int, int> q1,
 
 // ======================================================================================================================= //
 
-bool pointInTriangle2D(pair<int, int> p, pair<int, int> a,
-                       pair<int, int> b, pair<int, int> c) {
+bool pointInTriangle2D(pair<int, int> p, pair<int, int> a, pair<int, int> b, pair<int, int> c) {
   auto sign = [](pair<int, int> p1, pair<int, int> p2, pair<int, int> p3) {
     return (p1.first - p3.first) * (p2.second - p3.second) -
            (p2.first - p3.first) * (p1.second - p3.second);
@@ -155,7 +150,7 @@ bool pointInTriangle2D(pair<int, int> p, pair<int, int> a,
 
 // ======================================================================================================================= //
 
-bool segmentIntersectsPlane(const Vec3& a, const Vec3& b, const Plane& plane) {
+bool segmentIntersectsPlane(const Point3D& a, const Point3D& b, const Plane& plane) {
   int sideA = classifyPointToPlane(plane, a);
   int sideB = classifyPointToPlane(plane, b);
   return (sideA * sideB <= 0); // Um em cada lado ou um é coplanar
@@ -163,16 +158,19 @@ bool segmentIntersectsPlane(const Vec3& a, const Vec3& b, const Plane& plane) {
 
 // ======================================================================================================================= //
 
-bool segmentIntersectsTriangle(const Vec3& a, const Vec3& b, const Triangle& tri, const vector<Vec3>& points) {
-  const Vec3& p0 = points[tri.a - 1];
-  const Vec3& p1 = points[tri.b - 1];
-  const Vec3& p2 = points[tri.c - 1];
+bool segmentIntersectsTriangle(const Point3D& a, const Point3D& b, const Triangle& tri, const vector<Point3D>& points) {
 
-  // Plano do triângulo
-  Vec3 normal = (p1 - p0).cross(p2 - p0);
+  // Obtem vértices do triângulo
+  const Point3D& p0 = points[tri.a - 1];
+  const Point3D& p1 = points[tri.b - 1];
+  const Point3D& p2 = points[tri.c - 1];
 
-  Vec3 ab = b - a;
-  float denom = normal.dot(ab);
+  // Normal do plano do triângulo
+  Point3D normal = (p1 - p0).cross(p2 - p0);
+
+  // Verifica se o segmento é paralelo ao plano
+  Point3D ab = b - a;
+  float denom = normal.dot(ab); // denominador
 
   // Segmento é paralelo ao plano
   if (denom == 0) {
@@ -186,19 +184,20 @@ bool segmentIntersectsTriangle(const Vec3& a, const Vec3& b, const Triangle& tri
   // Calcula o ponto de interseção com o plano
   float t = normal.dot(p0 - a) / denom;
 
-  // Se t está fora do segmento [0,1], não intersecta
+  // Se t está fora do segmento [0,1], não intersecta.
+  // Equivalente a resolver normal · (a + ab * t - p0) = 0
   if (t < 0 || t > 1) return false;
 
   // Define a interseção como ponto com coordenadas reais
   double ix = a.x + (b.x - a.x) * t;
   double iy = a.y + (b.y - a.y) * t;
   double iz = a.z + (b.z - a.z) * t;
-  Vec3 intersection = Vec3(static_cast<int>(round(ix)), static_cast<int>(round(iy)), static_cast<int>(round(iz)));
+  Point3D intersection = Point3D(static_cast<int>(round(ix)), static_cast<int>(round(iy)), static_cast<int>(round(iz)));
 
   // Verifica se o ponto está dentro do triângulo usando coordenadas baricêntricas
-  Vec3 v0 = p1 - p0;
-  Vec3 v1 = p2 - p0;
-  Vec3 v2 = intersection - p0;
+  Point3D v0 = p1 - p0;
+  Point3D v1 = p2 - p0;
+  Point3D v2 = intersection - p0;
 
   float d00 = v0.dot(v0);
   float d01 = v0.dot(v1);
@@ -206,19 +205,20 @@ bool segmentIntersectsTriangle(const Vec3& a, const Vec3& b, const Triangle& tri
   float d11 = v1.dot(v1);
   float d12 = v1.dot(v2);
 
-  float denomBary = d00 * d11 - d01 * d01;
-  if (denomBary == 0) return false;
+  float denomBary = d00 * d11 - d01 * d01; // denominador baricêntrico
+  if (denomBary == 0) return false; // Triângulo degenerado, i.e, área zero
 
   float u = (d11 * d02 - d01 * d12) / denomBary;
   float v = (d00 * d12 - d01 * d02) / denomBary;
-
+  
+  // Se u >= 0, v >= 0 e u + v <= 1, então o ponto está dentro ou sobre a borda do triângulo.
   return (u >= 0) && (v >= 0) && (u + v <= 1);
 }
 
 
 // ======================================================================================================================= //
 
-void queryBSP(const BSPNode* node, const Vec3& a, const Vec3& b, const vector<Triangle>& triangles, const vector<Vec3>& points, set<int>& result) {
+void queryBSP(const BSPNode* node, const Point3D& a, const Point3D& b, const vector<Triangle>& triangles, const vector<Point3D>& points, set<int>& result) {
   if (!node) return;
 
   const Triangle& tri = triangles[node->triangle_index];
