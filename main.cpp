@@ -1,3 +1,14 @@
+/***********************************************************************
+ *
+ * Autor: Richard Fernando Heise Ferreira
+ * Matrícula: 201900121214
+ * Data: 06/2025
+ * Instituição: Universidade Federal do Paraná
+ * Curso: Mestrado em Segurança da Computação - PPG-Inf
+ * Motivo: Trabalho 3 da disciplina de Geometria Computacional
+ *
+ ************************************************************************/
+
 #include "bsp.hpp"
 #include <iostream>
 #include <string>
